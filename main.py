@@ -1,39 +1,59 @@
-import discord
-from discord.ext import commands
 import os
+import logging
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from bypass import AlpharedeBypass
 
-# Configurações do Bot
-TOKEN = os.getenv('DISCORD_TOKEN')
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+# Configuração de logs
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-@bot.event
-async def on_ready():
-    print(f'Bot conectado como {bot.user}')
+# Token do Telegram (Configurado na Square Cloud)
+TOKEN = os.getenv('TELEGRAM_TOKEN')
 
-@bot.command()
-async def bypass(ctx, url: str):
-    if "alpharede.com" not in url:
-        await ctx.send("❌ Por favor, envie um link válido da Alpharede.")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "👋 Olá! Eu sou o Alpharede Bypass Bot.\n\n"
+        "Envie o comando `/bypass [link]` para pular as etapas do encurtador.\n"
+        "Exemplo: `/bypass https://alpharede.com/yeIQFvd5Suj`"
+    )
+
+async def bypass_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("❌ Por favor, envie o link após o comando. Ex: `/bypass [link]`")
         return
 
-    msg = await ctx.send(f"⏳ Iniciando bypass de `{url}`... Isso pode levar cerca de 60 segundos.")
+    url = context.args[0]
+    if "alpharede.com" not in url:
+        await update.message.reply_text("❌ Por favor, envie um link válido da Alpharede.")
+        return
+
+    status_msg = await update.message.reply_text(f"⏳ Iniciando bypass... Isso leva cerca de 60 segundos (5 etapas).")
     
     try:
         bypasser = AlpharedeBypass()
         final_url = bypasser.bypass(url)
         
         if final_url:
-            await msg.edit(content=f"✅ **Link Burlado com Sucesso!**\n🔗 Destino: {final_url}")
+            await status_msg.edit_text(f"✅ **Link Burlado com Sucesso!**\n\n🔗 **Destino:** {final_url}")
         else:
-            await msg.edit(content="❌ Não foi possível burlar esse link no momento.")
+            await status_msg.edit_text("❌ Não foi possível burlar esse link no momento.")
     except Exception as e:
-        await msg.edit(content=f"⚠️ Ocorreu um erro: {str(e)}")
+        await status_msg.edit_text(f"⚠️ Ocorreu um erro: {str(e)}")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     if not TOKEN:
-        print("ERRO: DISCORD_TOKEN não configurado nas variáveis de ambiente.")
+        print("ERRO: TELEGRAM_TOKEN não configurado nas variáveis de ambiente.")
     else:
-        bot.run(TOKEN)
+        application = ApplicationBuilder().token(TOKEN).build()
+        
+        start_handler = CommandHandler('start', start)
+        bypass_handler = CommandHandler('bypass', bypass_command)
+        
+        application.add_handler(start_handler)
+        application.add_handler(bypass_handler)
+        
+        print("Bot Telegram iniciado...")
+        application.run_polling()
