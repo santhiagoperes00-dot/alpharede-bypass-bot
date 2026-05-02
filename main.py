@@ -1,5 +1,6 @@
 import os
 import logging
+import sys
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from bypass import AlpharedeBypass
@@ -10,8 +11,8 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Token do Telegram (Configurado na Square Cloud)
-TOKEN = os.getenv('TELEGRAM_TOKEN')
+# Tenta ler o token de várias formas para evitar erros da Square Cloud
+TOKEN = os.getenv('TELEGRAM_TOKEN', '').strip().replace('"', '').replace("'", "")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -44,9 +45,11 @@ async def bypass_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text(f"⚠️ Ocorreu um erro: {str(e)}")
 
 if __name__ == '__main__':
-    if not TOKEN:
-        print("ERRO: TELEGRAM_TOKEN não configurado nas variáveis de ambiente.")
-    else:
+    if not TOKEN or len(TOKEN) < 10:
+        print("FATAL: TELEGRAM_TOKEN não configurado corretamente nas variáveis de ambiente.")
+        sys.exit(1)
+    
+    try:
         application = ApplicationBuilder().token(TOKEN).build()
         
         start_handler = CommandHandler('start', start)
@@ -55,5 +58,8 @@ if __name__ == '__main__':
         application.add_handler(start_handler)
         application.add_handler(bypass_handler)
         
-        print("Bot Telegram iniciado...")
+        print("Bot Telegram iniciado com sucesso!")
         application.run_polling()
+    except Exception as e:
+        print(f"ERRO AO INICIAR BOT: {e}")
+        sys.exit(1)
